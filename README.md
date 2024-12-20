@@ -25,7 +25,7 @@
 3. You can find client id, otp claim, user session id and device id.
 
 ### Create a map.json file in the root folder your schema should be:
-`code`
+```json
 {
     "markets": {
         "include": {
@@ -41,7 +41,7 @@
         "CASH": "HSAV.TO"
     }
 }
-`code`
+```
 
 - Map markets that you want symbols to include suffixes and those where you do not want suffixes.
 - The symbols branch will lookup any **CASH** symbol in WS transactions. If there are multiple I have not dealt with this situation. So as the code is opensource feel free to change this.
@@ -55,9 +55,9 @@
 
 ### How to run
 within your venv: 
-`code`
+```bash
 python main.py
-`code`
+```
 
 
 ### To Do:
