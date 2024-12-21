@@ -2,6 +2,7 @@ import os
 import json
 import requests
 import uuid
+import datetime
 
 
 class Ghostfolio():
@@ -175,6 +176,14 @@ class Ghostfolio():
                             print("ordered entered successfully...")
                         else:
                             print(response.json())
+            # some more fun stuff added telegram bot messages to know
+            # that the update is complete.
+            # comment this code if you do not want this
+            today = str(datetime.datetime.today().date())
+            message: str = f"ghostfolio updated for date: {today}"
+            url = f"https://api.telegram.org/bot{os.getenv('TELEGRAM_TOKEN')}/sendMessage?chat_id={os.getenv('TELEGRAM_CHAT_ID')}&text={message}"
+            requests.get(url).json()
+
         except FileExistsError as e:
             print(e)
             exit()
