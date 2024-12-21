@@ -1,12 +1,5 @@
-import os
-import uuid
-import requests
-import json
-import re
-import argparse
 import datetime
 from dotenv import load_dotenv, find_dotenv
-import time
 from ws import WealthSimple
 from gf import Ghostfolio
 
@@ -38,5 +31,5 @@ def main():
         gf_accounts_list = ghostfolio.get_gf_accounts()
     ghostfolio.parse_ws_data(gf_accounts_list=gf_accounts_list)
 
-    
+
 main()

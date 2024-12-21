@@ -59,6 +59,12 @@ within your venv:
 python main.py
 ```
 
+### How to run with docker
+```bash
+docker build -t wealthsimple-autouploader -f Dockerfile $PWD
+docker run wealthsimple-autouploader
+```
+
 
 ### To Do:
 - Dockerize
