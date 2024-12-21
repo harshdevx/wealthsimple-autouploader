@@ -36,8 +36,6 @@ class WealthSimple():
             'x-ws-session-id': os.getenv('WS_USER_SESSION_ID')
         }
 
-        self.__get_ws_token()
-
         payload = {
             "grant_type": "password",
             "username": os.getenv('USERNAME'),

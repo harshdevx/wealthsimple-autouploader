@@ -64,7 +64,3 @@ python main.py
 docker build -t wealthsimple-autouploader -f Dockerfile $PWD
 docker run wealthsimple-autouploader
 ```
-
-
-### To Do:
-- Dockerize
