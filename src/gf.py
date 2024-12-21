@@ -145,12 +145,17 @@ class Ghostfolio():
                     for order in processed_data.get('orders'):
                         account = gf_accounts_list.get(order.get('accountId'))
 
+                        data_source = "YAHOO"
+
                         if (order.get('primary_exchange') is not None) and ((order.get('primary_exchange') not in map_data.get('markets').get('exclude'))) and (order.get('assetSymbol') != 'CASH'):
                             assetSymbol = f"{order.get('assetSymbol')}.{map_data.get('markets').get('include').get(order.get('primary_exchange'))}"
                         elif (order.get('primary_exchange') is not None) and ((order.get('primary_exchange') in map_data.get('markets').get('exclude'))) and (order.get('assetSymbol') != 'CASH'):
                             assetSymbol = order.get('assetSymbol')
                         elif (order.get('primary_exchange') == None) and (order.get('assetSymbol') == 'CASH'):
                             assetSymbol = map_data.get('symbols').get('CASH')
+                        elif (order.get('primary_exchange') == None) and (order.get('assetSymbol') == 'DOGE'):
+                            assetSymbol = map_data.get('symbols').get('DOGE')
+                            data_source = "COINGECKO"
 
                         post_data: dict = {
                             "accountId": account.get('id'),
@@ -160,7 +165,7 @@ class Ghostfolio():
                             "type": str(order.get('transactionType')).upper(),
                             "unitPrice": round(float(order.get('amount'))/float(order.get('assetQuantity')), 2),
                             "currency": order.get('currency'),
-                            "dataSource": "YAHOO",
+                            "dataSource": data_source,
                             "date": order.get('date'),
                             "symbol": assetSymbol
                         }
