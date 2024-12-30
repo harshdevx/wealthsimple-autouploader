@@ -1,23 +1,9 @@
 # Wealthsimple AutoUploader
 
 ## Pre-requisites
-1. Create a .env file with following data:
-    1. USERNAME=**wealthsimple user name**
-    2. PASSWORD=**wealthsimple password**
-    3. CLIENT_ID=**welthsimple client id**
-
-    4. WS_TOKEN_URL=https://api.production.wealthsimple.com/v1/oauth/v2/token
-    5. WS_WEB_URL=https://my.wealthsimple.com
-    6. WS_OTP_CLAIM=**your otp claim**
-    7. WS_USER_SESSION_ID=**your session id**
-    8. WS_DEVICE_ID=**your device id**
-
-    9. GHOSTFOLIO_USER_TOKEN=**your ghost folio user token**
-
-    
-    10. GHOSTFOLIO_URL=**http://localhost:3333/api/v1**
-
-2. Set up python venv. There are 100s of tutorials on how to setup venv so I will not get into that. We only need requests module.
+1. Create a .env file with data for multiple users a sample .env is added:
+2. <s>Set up python venv. There are 100s of tutorials on how to setup venv so I will not get into that. We only need requests module.</s> No more required as its dockerized now.
+3. 
 
 ### How to get wealthsimple credentials:
 1. Log in to wealthsimple account
@@ -52,6 +38,10 @@
 - Step 3: Once parsing is done we get additional information like stock exchange data for the symbol in orders.
 - Step 4: Prepare the data for posting into ghostfolio
 - Step 5: Post data to ghostfolio
+- Step 6: Run for the next account
+
+#### Note:
+The transactions are tracked in a temporary file that gets created during execution that maintains order hashes. If the order is found in user1 that matches hash or order found in user2 the order is not duplicated.
 
 ### How to run
 within your venv: 
@@ -64,3 +54,6 @@ python main.py
 docker build -t wealthsimple-autouploader -f Dockerfile $PWD
 docker run wealthsimple-autouploader
 ```
+
+### TO DO
+- Optimize multi user environment
