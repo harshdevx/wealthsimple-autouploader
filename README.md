@@ -3,7 +3,6 @@
 ## Pre-requisites
 1. Create a .env file with data for multiple users a sample .env is added:
 2. <s>Set up python venv. There are 100s of tutorials on how to setup venv so I will not get into that. We only need requests module.</s> No more required as its dockerized now.
-3. 
 
 ### How to get wealthsimple credentials:
 1. Log in to wealthsimple account
@@ -57,3 +56,4 @@ docker run wealthsimple-autouploader
 
 ### TO DO
 - Optimize multi user environment
+- WIP on renewing ws access token in an automated way
