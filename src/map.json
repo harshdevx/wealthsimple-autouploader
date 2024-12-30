@@ -1,0 +1,17 @@
+{
+    "markets": {
+        "include": {
+            "TSX": "TO",
+            "AEQUITAS NEO EXCHANGE": "NE"
+        },
+        "exclude": {
+            "BATS": "",
+            "NYSE": "",
+            "NASDAQ": ""
+        }
+    },
+    "symbols": {
+        "CASH": "HSAV.TO",
+        "DOGE": "dogecoin"
+    }
+}
