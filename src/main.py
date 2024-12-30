@@ -1,6 +1,4 @@
 import datetime
-import jwt
-import json
 from dotenv import load_dotenv, find_dotenv
 from ws import WealthSimple
 from gf import Ghostfolio
@@ -13,14 +11,14 @@ def main():
     update_master_data = True
     count = 0
 
-    from src.config import ws_user_accounts
+    from config import ws_user_accounts
     for ws_account in ws_user_accounts:
         count += 1
         print(
             f"processing request for id: {ws_account.get('username')} and iteration is {count}")
         wealth_simple = WealthSimple(ws_account)
         ghostfolio = Ghostfolio()
-        
+
         ws_accounts_list = wealth_simple.get_ws_accounts_list()
         today = str(datetime.datetime.today().date())
         wealth_simple.get_ws_data(today, today, ws_accounts_list)
