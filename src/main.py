@@ -1,12 +1,9 @@
 import datetime
-from dotenv import load_dotenv, find_dotenv
 from ws import WealthSimple
 from gf import Ghostfolio
 
 
 def main():
-    load_dotenv(find_dotenv())
-
     # declaring variables
     update_master_data = True
     count = 0
