@@ -114,7 +114,7 @@ class Ghostfolio():
                     f"checked item and found: {item} therefore not making changes...")
         print("finished updating accounts in ghostfolio....")
 
-    def parse_ws_data(self, gf_accounts_list, count):
+    def parse_ws_data(self, gf_accounts_list, count, user_name):
         try:
             if os.path.exists(self.__processed_data_file_path):
                 with open(self.__processed_data_file_path, 'r') as file:
@@ -289,7 +289,7 @@ class Ghostfolio():
                 file.close()
 
             today = str(datetime.datetime.today().date())
-            message: str = f"ghostfolio updated for date: {today}"
+            message: str = f"ghostfolio updated on date: {today} for user: {user_name}"
             url = f"https://api.telegram.org/bot{os.getenv('TELEGRAM_TOKEN')}/sendMessage?chat_id={os.getenv('TELEGRAM_CHAT_ID')}&text={message}"
             requests.get(url).json()
         except ZeroDivisionError as e:
@@ -298,7 +298,7 @@ class Ghostfolio():
         except FileExistsError as e:
             print(e)
             today = str(datetime.datetime.today().date())
-            message: str = f"could not run ghostfolio update: {today}"
+            message: str = f"could not run ghostfolio up date: {today} for user: {user_name}"
             url = f"https://api.telegram.org/bot{os.getenv('TELEGRAM_TOKEN')}/sendMessage?chat_id={os.getenv('TELEGRAM_CHAT_ID')}&text={message}"
             requests.get(url).json()
 

@@ -35,7 +35,7 @@ def main():
                                            ws_accounts_list=ws_accounts_list)
             gf_accounts_list = ghostfolio.get_gf_accounts()
         ghostfolio.parse_ws_data(
-            gf_accounts_list=gf_accounts_list, count=count)
+            gf_accounts_list=gf_accounts_list, count=count, user_name=ws_account.get('username'))
 
     ghostfolio.delete_order_hashes()
 
