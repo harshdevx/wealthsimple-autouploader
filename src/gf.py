@@ -5,6 +5,7 @@ import uuid
 import datetime
 import hashlib
 import time
+from db import DB, DatabaseError
 
 
 class Ghostfolio():
@@ -21,9 +22,14 @@ class Ghostfolio():
 
         self.__order_hash_list = []
         self.__dividends_hash_list = []
-        self.__order_hash_file_name = 'order_hash.json'
-        self.__order_hash_file_path = f"{os.getcwd()}/{self.__order_hash_file_name}"
+        # self.__order_hash_file_name = 'order_hash.json'
+        # self.__order_hash_file_path = f"{os.getcwd()}/{self.__order_hash_file_name}"
 
+        self.__db = DB()
+
+        self.__previous_orders: dict = self.get_order_hashes()
+
+        self.__order_hash_list = self.__previous_orders.get('order_hashes')
         gf_token_payload = json.dumps(
             {"accessToken": os.getenv('GF_USER_TOKEN')})
         gf_token_header: dict = {
@@ -39,6 +45,22 @@ class Ghostfolio():
             "Content-Type": "application/json",
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Safari/605.1.15"
         }
+
+    def schema_check(self):
+        sql = """SELECT COUNT(to_regclass('public."TempOrders"'));"""
+
+        self.__db.execute(sql)
+        row = self.__db.fetchone()
+
+        if row[0] == 0:
+            sql = """
+                    CREATE TABLE "public"."TempOrders" (
+                        "order_hash" text NOT NULL,
+                        "date" text,
+                        PRIMARY KEY ("order_hash")
+                    );
+                """
+            self.__db.execute(sql)
 
     def get_gf_accounts(self):
 
@@ -113,6 +135,45 @@ class Ghostfolio():
                 print(
                     f"checked item and found: {item} therefore not making changes...")
         print("finished updating accounts in ghostfolio....")
+    
+
+    def get_order_hashes(self):
+        try:
+
+            today = datetime.datetime.today().date()
+            day_before = str(today - datetime.timedelta(days=2))
+
+            sql = f"""
+                    DELETE FROM public."TempOrders" WHERE date LIKE '{day_before}%%';
+                """
+            self.__db.execute(sql)
+            self.__db.commit()
+
+            sql = """
+                    SELECT order_hash, date FROM public."TempOrders";
+                """
+            
+            self.__db.execute(sql)
+            rows = self.__db.fetchall()
+
+            order_hashes = []
+
+            if not rows:
+                order_hashes = []
+            
+            for row in rows:
+                order_hash = row[0]
+                order_hashes.append(order_hash)
+
+            previous_orders: dict = {
+
+                "order_hashes": order_hashes,
+                "order_hash_data": rows
+            }
+
+            return previous_orders
+        except DatabaseError as e:
+            print(e)
 
     def parse_ws_data(self, gf_accounts_list, count, user_name):
         try:
@@ -128,6 +189,8 @@ class Ghostfolio():
 
             processed_records = 1
             total_records = len(processed_data.get('orders'))
+
+            self.get_order_hashes()
 
             # process all orders
             if len(processed_data.get('orders')) > 0:
@@ -176,8 +239,17 @@ class Ghostfolio():
                         order_hash = hashlib.sha1(json.dumps(
                             post_data).encode('utf-8')).hexdigest()
 
+                        sql = f"""
+                                INSERT INTO public."TempOrders" (order_hash, date)
+                                VALUES ('{order_hash}', '{order.get('date')}')
+                                ON CONFLICT (order_hash) DO NOTHING;
+                                """
+                        self.__db.execute(sql)
+                        self.__db.commit()
+
                         if (count == 1):
                             if (order_hash not in self.__order_hash_list):
+                                print(post_data)
                                 response = requests.post(
                                     url=f"{os.getenv('GF_URL')}/order", headers=self.__modified_header, data=json.dumps(post_data))
                                 if response.status_code == 201:
@@ -188,27 +260,21 @@ class Ghostfolio():
                                     print(response.json())
                         else:
                             try:
-                                if os.path.exists(self.__order_hash_file_path):
-                                    with open(self.__order_hash_file_path, 'r+') as file:
-                                        final_hashes_list = json.load(
-                                            file)
-                                    file.close()
-
-                                    self.__order_hash_list = final_hashes_list.get(
-                                        'order_hashes')
-                                    if (order_hash not in self.__order_hash_list):
-                                        response = requests.post(
-                                            url=f"{os.getenv('GF_URL')}/order", headers=self.__modified_header, data=json.dumps(post_data))
-                                        if response.status_code == 201:
-                                            print(
-                                                f"order/dividend {processed_records} of {total_records} entered successfully...")
-                                            self.__order_hash_list.append(
-                                                order_hash)
-                                        else:
-                                            print(response.json())
-                                    else:
+                                self.get_order_hashes()
+                                if (order_hash not in self.__order_hash_list):
+                                    print(post_data)
+                                    response = requests.post(
+                                        url=f"{os.getenv('GF_URL')}/order", headers=self.__modified_header, data=json.dumps(post_data))
+                                    if response.status_code == 201:
                                         print(
-                                            "data matched for this record therefore not processing...")
+                                            f"order/dividend {processed_records} of {total_records} entered successfully...")
+                                        self.__order_hash_list.append(
+                                            order_hash)
+                                    else:
+                                        print(response.json())
+                                else:
+                                    print(
+                                        "data matched for this record therefore not processing...")
                             except FileExistsError as e:
                                 print(e)
 
@@ -218,6 +284,14 @@ class Ghostfolio():
                         url = f"{os.getenv('GF_URL')}/import/dividends/{data_source}/{assetSymbol}"
                         dividend_response = requests.get(
                             url=url, headers=self.__modified_header)
+                        
+                        url = f"{os.getenv('GF_URL')}/portfolio/holdings?accounts={account.get('id')}"
+                        account_response = requests.get(url=url, headers=self.__modified_header)
+
+                        if account_response.status_code == 200:
+                            for item in account_response.json().get('holdings'):
+                                if (item.get('symbol') == assetSymbol):
+                                    account_response_quantity = item.get('quantity')
 
                         if (dividend_response.status_code == 200):
                             post_data: dict = {
@@ -226,8 +300,7 @@ class Ghostfolio():
                                     "accountId": account.get('id'),
                                     "comment": "",
                                     "fee": 0,
-                                    "quantity": dividend_response.json().get('activities')[
-                                        0].get('quantity'),
+                                    "quantity": float(account_response_quantity),
                                     "type": "DIVIDEND",
                                     "unitPrice": dividend_response.json().get('activities')[
                                         0].get('unitPrice'),
@@ -240,9 +313,19 @@ class Ghostfolio():
 
                         order_hash = hashlib.sha1(json.dumps(
                             post_data).encode('utf-8')).hexdigest()
+                        
+                        sql = f"""
+                                INSERT INTO public."TempOrders" (order_hash, date)
+                                VALUES ('{order_hash}', '{order.get('date')}')
+                                ON CONFLICT (order_hash) DO NOTHING;                                
+                            """
+
+                        self.__db.execute(sql)
+                        self.__db.commit()
 
                         if (count == 1):
-                            if (order_hash not in self.__dividends_hash_list):
+                            if (order_hash not in self.__order_hash_list):
+                                print(post_data)
                                 response = requests.post(
                                     url=f"{os.getenv('GF_URL')}/import?dryRun=false", headers=self.__modified_header, data=json.dumps(post_data))
                                 if response.status_code == 201:
@@ -254,39 +337,25 @@ class Ghostfolio():
                                     print(response.json())
                         else:
                             try:
-                                if os.path.exists(self.__order_hash_file_path):
-                                    with open(self.__order_hash_file_path, 'r+') as file:
-                                        final_hashes_list = json.load(
-                                            file)
-                                    file.close()
-
-                                    self.__dividends_hash_list = final_hashes_list.get(
-                                        'dividend_hashes')
-                                    if (order_hash not in self.__dividends_hash_list):
-                                        response = requests.post(
-                                            url=f"{os.getenv('GF_URL')}/order", headers=self.__modified_header, data=json.dumps(post_data))
-                                        if response.status_code == 201:
-                                            print(
-                                                f"order/dividend {processed_records} of {total_records} entered successfully...")
-                                            self.__dividends_hash_list.append(
-                                                order_hash)
-                                        else:
-                                            print(response.json())
-                                    else:
+                                if (order_hash not in self.__order_hash_list):
+                                    print(post_data)
+                                    response = requests.post(
+                                        url=f"{os.getenv('GF_URL')}/order", headers=self.__modified_header, data=json.dumps(post_data))
+                                    if response.status_code == 201:
                                         print(
-                                            "data matched for this record therefore not processing...")
+                                            f"order/dividend {processed_records} of {total_records} entered successfully...")
+                                        self.__dividends_hash_list.append(
+                                            order_hash)
+                                    else:
+                                        print(response.json())
+                                else:
+                                    print(
+                                        "data matched for this record therefore not processing...")
                             except FileExistsError as e:
                                 print(e)
                     processed_records += 1
                     time.sleep(int(os.getenv('SLEEP_SECONDS')))
 
-                final_hashes_list = {
-                    "order_hashes": self.__order_hash_list,
-                    "dividend_hashes": self.__dividends_hash_list
-                }
-                with open(self.__order_hash_file_path, 'a+') as file:
-                    json.dump(final_hashes_list, file)
-                file.close()
 
             today = str(datetime.datetime.today().date())
             message: str = f"ghostfolio updated on date: {today} for user: {user_name}"
@@ -304,13 +373,4 @@ class Ghostfolio():
 
             exit()
 
-    def delete_order_hashes(self):
-        print("deleting order hashes...")
-
-        try:
-            if os.path.exists(self.__order_hash_file_path):
-                os.remove(self.__order_hash_file_path)
-
-        except FileExistsError as e:
-            print(e)
-        print("deleted order hashes....")
+    
