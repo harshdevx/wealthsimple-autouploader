@@ -3,7 +3,8 @@ import json
 import requests
 import time
 import jwt
-
+import datetime
+from telegram import Telegram
 
 class WealthSimple():
 
@@ -21,6 +22,8 @@ class WealthSimple():
 
         self.__processed_data_file_name = 'processed-data.json'
         self.__processed_data_file_path = f"{os.getcwd()}/{self.__processed_data_file_name}"
+
+        self.__bot = Telegram()
         
         self.__headers: dict = {
             'accept': 'application/json',
@@ -55,10 +58,10 @@ class WealthSimple():
             self.__tokens['access_token'] = response.json().get('access_token')
             self.__tokens['refresh_token'] = response.json().get(
                 'refresh_token')
-
             
         else:
-            print(f"error fetching tokens: {response.status_code}")
+            today = str(datetime.datetime.today().date())
+            self.__bot.send_message(f"{today} - wealthsimple getting access token failed for user: {self.__ws_user_account.get('username')}")
             exit()
 
         self.__modified_headers: dict = {

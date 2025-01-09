@@ -6,6 +6,7 @@ import datetime
 import hashlib
 import time
 from db import DB, DatabaseError
+from telegram import Telegram
 
 
 class Ghostfolio():
@@ -22,6 +23,8 @@ class Ghostfolio():
 
         self.__order_hash_list = []
         self.__dividends_hash_list = []
+
+        self.__bot = Telegram()
         # self.__order_hash_file_name = 'order_hash.json'
         # self.__order_hash_file_path = f"{os.getcwd()}/{self.__order_hash_file_name}"
 
@@ -358,17 +361,15 @@ class Ghostfolio():
 
 
             today = str(datetime.datetime.today().date())
-            message: str = f"ghostfolio updated on date: {today} for user: {user_name}"
-            url = f"https://api.telegram.org/bot{os.getenv('TELEGRAM_TOKEN')}/sendMessage?chat_id={os.getenv('TELEGRAM_CHAT_ID')}&text={message}"
-            requests.get(url).json()
+            self.__bot.send_message(f"ghostfolio updated on date: {today} for user: {user_name}")
+            
         except ZeroDivisionError as e:
             print(e)
 
         except FileExistsError as e:
             print(e)
             today = str(datetime.datetime.today().date())
-            message: str = f"could not run ghostfolio up date: {today} for user: {user_name}"
-            url = f"https://api.telegram.org/bot{os.getenv('TELEGRAM_TOKEN')}/sendMessage?chat_id={os.getenv('TELEGRAM_CHAT_ID')}&text={message}"
+            self.__bot.send_message(f"could not run ghostfolio up date: {today} for user: {user_name}")
             requests.get(url).json()
 
             exit()

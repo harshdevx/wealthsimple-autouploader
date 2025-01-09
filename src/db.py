@@ -1,11 +1,6 @@
 import os
 from psycopg2 import connect, DatabaseError
 
-# from pymysql import connect
-# from pymysql.cursors import DictCursor
-
-
-
 class DB():
 
     def __init__(self):
