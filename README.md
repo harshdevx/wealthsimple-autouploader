@@ -1,5 +1,14 @@
 # Wealthsimple AutoUploader
 
+## Update 2025-01-09
+#### Problem statement
+- Dividends were not being entered properly as wealthsimple handles dividend differently than ghostfolio
+- With multiple users transactions were getting duplicated
+#### Solution
+- Created a table in postgres database called TempOrders with order_hash and date to keep a track of the order hashes
+- Before the order is submitted to the api it checks if the order hash is matching in TempOrders table and then proceeds
+
+
 ## Pre-requisites
 1. Create a .env file with data for multiple users a sample .env is added:
 2. <s>Set up python venv. There are 100s of tutorials on how to setup venv so I will not get into that. We only need requests module.</s> No more required as its dockerized now.
