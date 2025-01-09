@@ -1,4 +1,5 @@
 #!/bin/bash
+git pull origin main
 for CONTAINER in `docker ps -a | awk '{ print $1"-"$2 }'`
 do
 
@@ -25,6 +26,5 @@ do
 	fi
 done
 
-git pull origin main
 docker build -t ws -f Dockerfile $PWD
 
