@@ -361,7 +361,8 @@ class Ghostfolio():
 
 
             today = str(datetime.datetime.today().date())
-            self.__bot.send_message(f"ghostfolio updated on date: {today} for user: {user_name}")
+            if (len(total_records) > 0):
+                self.__bot.send_message(f"ghostfolio updated on date: {today} for user: {user_name}")
             
         except ZeroDivisionError as e:
             print(e)
