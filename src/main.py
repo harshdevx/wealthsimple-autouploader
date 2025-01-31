@@ -20,8 +20,7 @@ def main():
 
         ws_accounts_list = wealth_simple.get_ws_accounts_list()
         today = datetime.datetime.today().date()
-        yesterday = str(today - datetime.timedelta(days=1))
-        wealth_simple.get_ws_data(yesterday, yesterday, ws_accounts_list)
+        wealth_simple.get_ws_data(today, today, ws_accounts_list)
     
         raw_data = wealth_simple.get_raw_ws_data()
 
