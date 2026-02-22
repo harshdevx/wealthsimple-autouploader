@@ -3,17 +3,14 @@ import json
 import requests
 import time
 import jwt
-import datetime
+import keyring
 from telegram import Telegram
 
-class WealthSimple():
+from ws_api import WealthsimpleAPI, OTPRequiredException, LoginFailedException, WSAPISession
 
+
+class WealthSimple:
     def __init__(self, ws_user_account):
-
-        self.__tokens: dict = {
-            'access_token': "",
-            'refresh_token': ""
-        }
 
         self.__ws_user_account = ws_user_account
 
@@ -24,55 +21,73 @@ class WealthSimple():
         self.__processed_data_file_path = f"{os.getcwd()}/{self.__processed_data_file_name}"
 
         self.__bot = Telegram()
-        
-        self.__headers: dict = {
-            'accept': 'application/json',
-            'accept-language': 'en-US,en;q=0.9',
-            'origin': os.getenv('WS_WEB_URL'),
-            'priority': 'u=1, i',
-            'referer': os.getenv('WS_WEB_URL'),
-            'sec-fetch-dest': 'empty',
-            'sec-fetch-mode': 'cors',
-            'sec-fetch-site': 'same-site',
-            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Safari/605.1.15',
-            'x-wealthsimple-client': '@wealthsimple/wealthsimple',
-            'x-wealthsimple-otp-claim': self.__ws_user_account.get('ws_otp_claim'),
-            'x-ws-device-id': self.__ws_user_account.get('ws_device_id'),
-            'x-ws-profile': 'undefined',
-            'x-ws-session-id': self.__ws_user_account.get('ws_user_session_id')
-        }
 
-        self.__payload = {
-            "grant_type": "password",
-            "username": self.__ws_user_account.get('username'),
-            "password": self.__ws_user_account.get('password'),
-            "skip_provision": True,
-            "scope": "invest.read invest.write trade.read trade.write tax.read tax.write",
-            "client_id": self.__ws_user_account.get('client_id')
-        }
+        # 1. Define a function that will be called when the session is created or updated.
+        # Persist the session to a safe place, like in the keyring
+        keyring_service_name = "ws-session"
+        username = ws_user_account.get("username")
 
-        response = requests.post(url=os.getenv(
-            'WS_TOKEN_URL'), headers=self.__headers, data=self.__payload)
+        def persist_session_fct(sess, uname): return keyring.set_password(
+            f"{keyring_service_name}.{uname}", "session", sess)
+        # The session contains tokens that can be used to empty your Wealthsimple account, so treat it with respect!
+        # i.e. don't store it in a Git repository, or anywhere it can be accessed by others!
 
-        if response.status_code == 200:
-            self.__tokens['access_token'] = response.json().get('access_token')
-            self.__tokens['refresh_token'] = response.json().get(
-                'refresh_token')
-            
-        else:
-            today = str(datetime.datetime.today().date())
-            self.__bot.send_message(f"{today} - wealthsimple getting access token failed for user: {self.__ws_user_account.get('username')}")
-            exit()
+        # If you want, you can set a custom User-Agent for the requests to the WealthSimple API:
+        WealthsimpleAPI.set_user_agent(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36")
+
+        # 2. If it's the first time you run this, create a new session using the username & password (and TOTP answer, if needed). Do NOT save those infos in your code!
+
+        self.__session = keyring.get_password(
+            f"{keyring_service_name}.{username}", "session")
+        if self.__session:
+            self.__session = WSAPISession.from_json(self.__session)
+        if not self.__session:
+            username = ws_user_account.get("username")
+            password = ws_user_account.get("password")
+            otp_answer = None
+            while True:
+                try:
+                    if not username:
+                        username = ws_user_account.get("username")
+                        self.__session = keyring.get_password(
+                            f"{keyring_service_name}.{username}", "session")
+                        if self.__session:
+                            self.__session = WSAPISession.from_json(
+                                self.__session)
+                            break
+                    if not password:
+                        password = ws_user_account.get("password")
+                    WealthsimpleAPI.login(
+                        username, password, otp_answer, persist_session_fct=persist_session_fct)
+                    # The above will throw exceptions if login failed
+                    # So we break (out of the login "while True" loop) on success:
+                    self.__session = WSAPISession.from_json(
+                        keyring.get_password(f"{keyring_service_name}.{username}", "session"))
+                    break
+                except OTPRequiredException:
+                    otp_answer = input("TOTP code: ")
+                except LoginFailedException:
+                    print("Login failed. Try again.")
+                    username = ws_user_account.get("username")
+                    password = ws_user_account.get("password")
+
+        # 3. Use the session object to instantiate the API object
+        ws = WealthsimpleAPI.from_token(
+            self.__session, persist_session_fct, username)
+
+        self
 
         self.__modified_headers: dict = {
-            "Authorization": f"Bearer {self.__tokens.get('access_token')}",
+            "Authorization": f"Bearer {self.__session.access_token}",
             "Content-Type": "application/json"
         }
 
     def get_ws_accounts_list(self):
         ws_accounts_list = []
+        decoded_jwt = jwt.decode(jwt=self.__session.access_token, key=None, options={
+                                 "verify_signature": False})
 
-        decoded_jwt = jwt.decode(jwt=self.__tokens.get('access_token'), key=None, options={"verify_signature": False})
         query_payload = json.dumps({
             "operationName": "FetchAllAccountFinancials",
             "variables": {
@@ -84,13 +99,12 @@ class WealthSimple():
 
         accounts_response = requests.post(
             url=os.getenv('WS_GRAPH_URL'), headers=self.__modified_headers, data=query_payload)
-        
         for item in accounts_response.json().get('data').get('identity').get('accounts').get('edges'):
 
             if item.get('node').get('status') == 'open':
-                ws_accounts_list.append({"accountId": item.get('node').get('id'), "supportedCurrency": item.get('node').get('supportedCurrencies')[0]})
+                ws_accounts_list.append({"accountId": item.get('node').get(
+                    'id'), "supportedCurrency": item.get('node').get('supportedCurrencies')[0]})
         return ws_accounts_list
-
 
     def get_ws_data(self, start_date: str, end_date: str, ws_account_list):
 
@@ -173,7 +187,7 @@ class WealthSimple():
             json.dump(final_data, file)
 
         file.close()
-    
+
     # process ws raw data
     def get_raw_ws_data(self):
 

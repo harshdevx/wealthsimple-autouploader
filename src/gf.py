@@ -66,7 +66,6 @@ class Ghostfolio():
             self.__db.execute(sql)
 
     def get_gf_accounts(self):
-
         gf_accounts_list = {}
         response = requests.get(
             url=f"{os.getenv('GF_URL')}/account", headers=self.__modified_header)
@@ -89,12 +88,10 @@ class Ghostfolio():
         print("creating accounts in ghostfolio....")
 
         for item in ws_accounts_list:
-            item_uuid = str(uuid.uuid4()).lower()
             payload: dict = {
                 "balance": 0,
                 "comment": None,
                 "currency": item.get('supportedCurrency'),
-                "id": item_uuid,
                 "isExcluded": False,
                 "name": item.get('accountId'),
                 "platformId": "34fec028-e9ae-4d73-b6c6-09d018418754"
@@ -112,18 +109,23 @@ class Ghostfolio():
 
     def update_account_list(self, gf_accounts_list, ws_accounts_list):
 
+        url = f"{os.getenv('GF_URL')}/platform"
+        platforms_response = requests.get(url, headers=self.__modified_header)
+
+        if platforms_response.status_code == 200:
+            for platform in platforms_response.json():
+                if "harshal" in platform.get('name', '').lower() or "devika" in platform.get('name', '').lower():
+                    platform_id = platform.get('id')
         print("updating accounts in ghostfolio....")
         for item in ws_accounts_list:
             if item.get('accountId') not in gf_accounts_list.keys():
-                item_uuid = str(uuid.uuid4()).lower()
                 payload: dict = {
                     "balance": 0,
                     "comment": None,
                     "currency": item.get('supportedCurrency'),
-                    "id": item_uuid,
                     "isExcluded": False,
                     "name": item.get('accountId'),
-                    "platformId": "34fec028-e9ae-4d73-b6c6-09d018418754"
+                    "platformId": platform_id
                 }
 
                 response = requests.post(
@@ -138,7 +140,6 @@ class Ghostfolio():
                 print(
                     f"checked item and found: {item} therefore not making changes...")
         print("finished updating accounts in ghostfolio....")
-    
 
     def get_order_hashes(self):
         try:
@@ -155,7 +156,7 @@ class Ghostfolio():
             sql = """
                     SELECT order_hash, date FROM public."TempOrders";
                 """
-            
+
             self.__db.execute(sql)
             rows = self.__db.fetchall()
 
@@ -163,7 +164,7 @@ class Ghostfolio():
 
             if not rows:
                 order_hashes = []
-            
+
             for row in rows:
                 order_hash = row[0]
                 order_hashes.append(order_hash)
@@ -287,16 +288,25 @@ class Ghostfolio():
                         url = f"{os.getenv('GF_URL')}/import/dividends/{data_source}/{assetSymbol}"
                         dividend_response = requests.get(
                             url=url, headers=self.__modified_header)
-                        
-                        url = f"{os.getenv('GF_URL')}/portfolio/holdings?accounts={account.get('id')}"
-                        account_response = requests.get(url=url, headers=self.__modified_header)
 
+                        url = f"{os.getenv('GF_URL')}/portfolio/holdings?accounts={account.get('id')}"
+                        account_response = requests.get(
+                            url=url, headers=self.__modified_header)
+
+                        account_response_quantity = 0
                         if account_response.status_code == 200:
                             for item in account_response.json().get('holdings'):
                                 if (item.get('symbol') == assetSymbol):
-                                    account_response_quantity = item.get('quantity')
+                                    account_response_quantity = item.get(
+                                        'quantity')
+                                    break
 
                         if (dividend_response.status_code == 200):
+                            dividend_activities = dividend_response.json().get('activities') or []
+                            if not dividend_activities:
+                                print(
+                                    f"No dividend activities found for symbol {assetSymbol}, skipping...")
+                                continue
                             post_data: dict = {
                                 "accounts": [],
                                 "activities": [{
@@ -305,22 +315,25 @@ class Ghostfolio():
                                     "fee": 0,
                                     "quantity": float(account_response_quantity),
                                     "type": "DIVIDEND",
-                                    "unitPrice": dividend_response.json().get('activities')[
-                                        0].get('unitPrice'),
+                                    "unitPrice": dividend_activities[0].get('unitPrice'),
                                     "currency": currency,
                                     "dataSource": data_source,
                                     "date": order.get('date'),
                                     "symbol": assetSymbol
                                 }]
                             }
+                        else:
+                            print(
+                                f"Failed to fetch dividend data for symbol {assetSymbol} (status {dividend_response.status_code}), skipping...")
+                            continue
 
                         order_hash = hashlib.sha1(json.dumps(
                             post_data).encode('utf-8')).hexdigest()
-                        
+
                         sql = f"""
                                 INSERT INTO public."TempOrders" (order_hash, date)
                                 VALUES ('{order_hash}', '{order.get('date')}')
-                                ON CONFLICT (order_hash) DO NOTHING;                                
+                                ON CONFLICT (order_hash) DO NOTHING;
                             """
 
                         self.__db.execute(sql)
@@ -359,20 +372,19 @@ class Ghostfolio():
                     processed_records += 1
                     time.sleep(int(os.getenv('SLEEP_SECONDS')))
 
-
             today = str(datetime.datetime.today().date())
             if (total_records > 0):
-                self.__bot.send_message(f"ghostfolio updated on date: {today} for user: {user_name}")
-            
+                self.__bot.send_message(
+                    f"ghostfolio updated on date: {today} for user: {user_name}")
+
         except ZeroDivisionError as e:
             print(e)
 
         except FileExistsError as e:
             print(e)
             today = str(datetime.datetime.today().date())
-            self.__bot.send_message(f"could not run ghostfolio up date: {today} for user: {user_name}")
+            self.__bot.send_message(
+                f"could not run ghostfolio up date: {today} for user: {user_name}")
             requests.get(url).json()
 
             exit()
-
-    
