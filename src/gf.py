@@ -109,12 +109,18 @@ class Ghostfolio():
 
     def update_account_list(self, gf_accounts_list, ws_accounts_list):
 
+        if os.path.exists(self.__map_file_path):
+            with open(self.__map_file_path, 'r') as file:
+                map_data = json.load(file)
+        platform_names = [name.lower()
+                          for name in map_data.get('platforms', [])]
+
         url = f"{os.getenv('GF_URL')}/platform"
         platforms_response = requests.get(url, headers=self.__modified_header)
 
         if platforms_response.status_code == 200:
             for platform in platforms_response.json():
-                if "harshal" in platform.get('name', '').lower() or "devika" in platform.get('name', '').lower():
+                if any(name in platform.get('name', '').lower() for name in platform_names):
                     platform_id = platform.get('id')
         print("updating accounts in ghostfolio....")
         for item in ws_accounts_list:
