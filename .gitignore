@@ -1,2 +1,4 @@
 **/data*.json
 **/processed-data.json
+map.json
+**/.env
