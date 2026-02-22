@@ -3,3 +3,4 @@ pyjwt
 psycopg2-binary
 ws-api
 keyring
+python-dotenv
