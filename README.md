@@ -1,5 +1,11 @@
 # Wealthsimple AutoUploader
 
+## Update 2026-02-22
+### Updates to WealthSimple library
+- Wealthsimple has made some updates on the api side. Thank you @gboudreau https://github.com/gboudreau/ws-api-python for providing this library. 
+- Updated ws.py to use ws-api library to store credentials in keyring 
+- Updated gf.py for handling errors.
+
 ## Update 2025-01-09
 #### Problem statement
 - Dividends were not being entered properly as wealthsimple handles dividend differently than ghostfolio
